@@ -26,6 +26,8 @@ final class DictationCoordinator {
     private var target: FocusTarget?
     private var lastMessage: String?
     private var lastTranscript: String?
+    /// Esc or a click arrived while the microphone was still starting up.
+    private var stopRequested = false
 
     private var playSounds: Bool {
         get { UserDefaults.standard.object(forKey: "playSounds") as? Bool ?? true }
@@ -36,7 +38,7 @@ final class DictationCoordinator {
 
     func bootstrap() async {
         _ = statusItem
-        log.info("Accessibility trusted: \(Permissions.accessibilityGranted, privacy: .public)")
+        log.notice("Accessibility trusted: \(Permissions.accessibilityGranted, privacy: .public)")
         // Download the voice model while the user answers the permission prompts.
         async let model: Void = prepareModel()
         _ = await Permissions.requestMicrophone()
@@ -66,7 +68,8 @@ final class DictationCoordinator {
         switch state {
         case .idle: Task { await start() }
         case .recording: Task { await stop() }
-        case .starting, .finalizing: break
+        case .starting: stopRequested = true // finish as soon as recording has started
+        case .finalizing: break
         }
     }
 
@@ -82,9 +85,19 @@ final class DictationCoordinator {
         }
 
         state = .starting
+        stopRequested = false
         let target = FocusTarget.capture()
         self.target = target
         model.reset(targetName: target.appName)
+
+        // Listen for Esc right away, so a quick Esc during startup isn't sent to the focused app.
+        let escMode = escapeMonitor.start()
+        log.notice("Esc listener: \(escMode.rawValue, privacy: .public), secure input: \(EscapeKeyMonitor.secureInputActive, privacy: .public)")
+        switch escMode {
+        case .unavailable: model.notice = "Esc needs Accessibility access · click ◎ to finish"
+        case .intercepting, .observing:
+            if EscapeKeyMonitor.secureInputActive { model.notice = "Esc is blocked by a secure input field · click ◎ to finish" }
+        }
 
         do {
             let model = self.model
@@ -103,9 +116,10 @@ final class DictationCoordinator {
             state = .recording
             statusItem.look = .recording
             hud.show(below: statusItem.button)
-            escapeMonitor.start()
             if playSounds { NSSound(named: "Tink")?.play() }
+            if stopRequested { await stop() }
         } catch {
+            escapeMonitor.stop()
             state = .idle
             flashError("Couldn't start listening: \(error.localizedDescription)")
         }

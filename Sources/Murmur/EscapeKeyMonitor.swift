@@ -1,4 +1,6 @@
 import AppKit
+import ApplicationServices
+import Carbon.HIToolbox
 import CoreGraphics
 
 /// Catches a plain Esc press system-wide while dictation is active.
@@ -21,8 +23,19 @@ final class EscapeKeyMonitor {
         self.onEscape = onEscape
     }
 
-    func start() {
-        guard tap == nil, fallbackMonitor == nil else { return }
+    enum Mode: String {
+        /// Esc is caught and swallowed before the focused app sees it.
+        case intercepting
+        /// Esc is seen, but the focused app also receives it.
+        case observing
+        /// No Accessibility permission: macOS won't let us see other apps' keys.
+        case unavailable
+    }
+
+    @discardableResult
+    func start() -> Mode {
+        if tap != nil { return .intercepting }
+        if fallbackMonitor != nil { return .observing }
 
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
         if let tap = CGEvent.tapCreate(
@@ -38,12 +51,15 @@ final class EscapeKeyMonitor {
             CGEvent.tapEnable(tap: tap, enable: true)
             self.tap = tap
             self.runLoopSource = source
-        } else {
-            fallbackMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard Int64(event.keyCode) == Self.escapeKeyCode, !Self.hasModifiers(event.modifierFlags) else { return }
-                MainActor.assumeIsolated { self?.onEscape() }
-            }
+            return .intercepting
         }
+        // A global monitor also needs Accessibility for key events, so without it there's nothing to fall back to.
+        guard AXIsProcessTrusted() else { return .unavailable }
+        fallbackMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard Int64(event.keyCode) == Self.escapeKeyCode, !Self.hasModifiers(event.modifierFlags) else { return }
+            MainActor.assumeIsolated { self?.onEscape() }
+        }
+        return .observing
     }
 
     func stop() {
@@ -80,6 +96,10 @@ final class EscapeKeyMonitor {
             return false
         }
     }
+
+    /// When a password field (or e.g. Terminal's Secure Keyboard Entry) is active,
+    /// macOS hides all keystrokes from event taps, including Esc.
+    static var secureInputActive: Bool { IsSecureEventInputEnabled() }
 
     private static func hasModifiers(_ flags: NSEvent.ModifierFlags) -> Bool {
         !flags.intersection([.command, .option, .control, .shift]).isEmpty
