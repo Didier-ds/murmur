@@ -9,6 +9,8 @@ final class DictationModel {
     var volatile = ""
     var label = "Listening"
     var targetName = ""
+    /// Replaces the footer hint after dictation, e.g. when text was only copied.
+    var notice: String?
     var startedAt = Date()
     /// Smoothed microphone level, 0...1.
     var level: Float = 0
@@ -17,6 +19,7 @@ final class DictationModel {
         finalized = ""
         volatile = ""
         label = "Listening"
+        notice = nil
         self.targetName = targetName
         startedAt = Date()
         level = 0

@@ -114,9 +114,13 @@ struct HUDView: View {
 
     private var footer: some View {
         HStack {
-            Text("→ \(model.targetName)")
-            Spacer()
-            Text("esc or click ◎ to finish")
+            if let notice = model.notice {
+                Text(notice).foregroundStyle(.white.opacity(0.75))
+            } else {
+                Text("→ \(model.targetName)")
+                Spacer()
+                Text("esc or click ◎ to finish")
+            }
         }
         .font(.system(size: 11))
         .foregroundStyle(.white.opacity(0.38))

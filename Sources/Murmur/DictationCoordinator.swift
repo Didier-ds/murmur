@@ -25,6 +25,7 @@ final class DictationCoordinator {
     private var session: SpeechSession?
     private var target: FocusTarget?
     private var lastMessage: String?
+    private var lastTranscript: String?
 
     private var playSounds: Bool {
         get { UserDefaults.standard.object(forKey: "playSounds") as? Bool ?? true }
@@ -125,19 +126,38 @@ final class DictationCoordinator {
             text = model.finalized + model.volatile
         }
         self.session = nil
-        hud.hide()
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { lastTranscript = text }
 
-        let method = await inserter.insert(text, into: target)
-        log.info("Inserted \(text.count) chars via \(method?.rawValue ?? "nothing", privacy: .public)")
+        let outcome = await inserter.insert(text, into: target)
+        log.info("Dictation of \(text.count) chars: \(String(describing: outcome), privacy: .public)")
         state = .idle
-        if method == .clipboard {
+
+        switch outcome {
+        case .copiedNoField:
+            // Nothing to type into: keep the capsule up briefly so the user knows where the text went.
+            lastMessage = nil
+            statusItem.look = .idle
+            showNotice("No text field focused — copied. Click a field and press ⌘V.")
+        case .copiedNoPermission:
+            showNotice("Copied — press ⌘V. Murmur needs Accessibility to type for you.")
             flashError("Copied to clipboard — press ⌘V. Murmur needs Accessibility access to type for you.")
             Permissions.promptAccessibility()
-            return
+        case .typed, .pasted, nil:
+            hud.hide()
+            lastMessage = nil
+            if playSounds && outcome != nil { NSSound(named: "Pop")?.play() }
+            statusItem.look = .idle
         }
-        lastMessage = nil
-        if playSounds && method != nil { NSSound(named: "Pop")?.play() }
-        statusItem.look = .idle
+    }
+
+    private func showNotice(_ notice: String) {
+        model.label = "Copied"
+        model.notice = notice
+        if playSounds { NSSound(named: "Pop")?.play() }
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            if state == .idle { hud.hide() }
+        }
     }
 
     /// Throw the dictation away without inserting anything (menu → Cancel Dictation).
@@ -184,6 +204,12 @@ final class DictationCoordinator {
         menu.addItem(action(state == .recording ? "Stop Dictation" : "Start Dictation") { [weak self] in self?.toggle() })
         if state == .recording {
             menu.addItem(action("Cancel Dictation") { [weak self] in self?.cancel() })
+        }
+        if let lastTranscript {
+            menu.addItem(action("Copy Last Dictation") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(lastTranscript, forType: .string)
+            })
         }
 
         if !Permissions.microphoneGranted {
