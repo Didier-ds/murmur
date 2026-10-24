@@ -16,6 +16,7 @@ final class DictationCoordinator {
         makeMenu: { [weak self] in self?.makeMenu() ?? NSMenu() },
         level: { [weak self] in self?.model.level ?? 0 }
     )
+    private lazy var escapeMonitor = EscapeKeyMonitor(onEscape: { [weak self] in self?.cancel() })
 
     private var state = State.idle
     private var setup = Setup.checking
@@ -99,6 +100,7 @@ final class DictationCoordinator {
             state = .recording
             statusItem.look = .recording
             hud.show(below: statusItem.button)
+            escapeMonitor.start()
             if playSounds { NSSound(named: "Tink")?.play() }
         } catch {
             state = .idle
@@ -108,6 +110,7 @@ final class DictationCoordinator {
 
     private func stop() async {
         guard let session, let target else { return }
+        escapeMonitor.stop()
         state = .finalizing
         statusItem.look = .busy
         model.label = "Sealing"
@@ -133,6 +136,19 @@ final class DictationCoordinator {
 
         state = .idle
         statusItem.look = .idle
+    }
+
+    /// Esc while listening: throw the dictation away without inserting anything.
+    func cancel() {
+        guard state == .recording, let session else { return }
+        escapeMonitor.stop()
+        self.session = nil
+        target = nil
+        state = .idle
+        statusItem.look = .idle
+        hud.hide()
+        log.info("Dictation cancelled")
+        Task { await session.cancel() }
     }
 
     private func flashError(_ message: String) {
@@ -164,6 +180,9 @@ final class DictationCoordinator {
         menu.addItem(.separator())
 
         menu.addItem(action(state == .recording ? "Stop Dictation" : "Start Dictation") { [weak self] in self?.toggle() })
+        if state == .recording {
+            menu.addItem(action("Cancel Dictation") { [weak self] in self?.cancel() })
+        }
 
         if !Permissions.microphoneGranted {
             menu.addItem(action("Grant Microphone Access…") { Permissions.openSettings("Privacy_Microphone") })
