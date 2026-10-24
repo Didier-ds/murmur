@@ -10,6 +10,7 @@ final class DictationCoordinator {
     private let log = Logger(subsystem: "dev.murmur.Murmur", category: "dictation")
     private let model = DictationModel()
     private let inserter = InsertionService()
+    private lazy var hud = HUDController(model: model)
     private lazy var statusItem = StatusItemController(
         onToggle: { [weak self] in self?.toggle() },
         makeMenu: { [weak self] in self?.makeMenu() ?? NSMenu() },
@@ -95,6 +96,7 @@ final class DictationCoordinator {
             )
             state = .recording
             statusItem.look = .recording
+            hud.show(below: statusItem.button)
             if playSounds { NSSound(named: "Tink")?.play() }
         } catch {
             state = .idle
@@ -116,6 +118,7 @@ final class DictationCoordinator {
             text = model.finalized + model.volatile
         }
         self.session = nil
+        hud.hide()
 
         let method = await inserter.insert(text, into: target)
         log.info("Inserted \(text.count) chars via \(method?.rawValue ?? "nothing", privacy: .public)")
