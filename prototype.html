@@ -1,0 +1,307 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --mac: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+          --ember: #ff5a3c; --ice: #cfe6ff; }
+  * { box-sizing: border-box; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tab { font: 500 13px var(--font-sans); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+         background: transparent; color: var(--muted-foreground); cursor: pointer; }
+  .tab.on { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .hint { font-size: 12.5px; color: var(--muted-foreground); margin: 0 0 10px; }
+
+  /* ---------- Desktop: black obsidian ---------- */
+  .desk { position: relative; height: 500px; border-radius: var(--radius); overflow: hidden; font-family: var(--mac); color: #e8e8ee;
+          background:
+            radial-gradient(60% 50% at 78% 18%, rgba(120,150,255,.16), transparent 70%),
+            radial-gradient(50% 40% at 20% 95%, rgba(255,90,60,.10), transparent 70%),
+            linear-gradient(180deg, #07070a, #0c0c12 60%, #050507); }
+  .desk::before { /* faint horizon reflection line */
+    content: ""; position: absolute; left: 0; right: 0; top: 64%; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); }
+
+  /* Shared "dark mirror" surface */
+  .mirror { position: relative; background: linear-gradient(180deg, rgba(28,28,36,.72), rgba(8,8,12,.82));
+            backdrop-filter: blur(30px) saturate(1.4); -webkit-backdrop-filter: blur(30px) saturate(1.4);
+            box-shadow: 0 30px 80px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.14), inset 0 -1px 0 rgba(255,255,255,.03); }
+  .mirror::before { /* chrome rim */
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: linear-gradient(160deg, rgba(255,255,255,.38), rgba(255,255,255,.05) 35%, rgba(255,255,255,.02) 65%, rgba(255,255,255,.18));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  .mirror::after { /* specular sweep */
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; overflow: hidden;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.07) 45%, transparent 55%) -200% 0 / 250% 100% no-repeat;
+    animation: sheen 7s ease-in-out infinite; }
+  @keyframes sheen { 0%, 60% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+  /* Menu bar */
+  .menubar { height: 28px; display: flex; align-items: center; padding: 0 12px; gap: 16px; font-size: 13px; color: rgba(255,255,255,.88);
+             background: rgba(0,0,0,.35); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+             border-bottom: 1px solid rgba(255,255,255,.05); position: relative; z-index: 4; }
+  .menubar .sp { flex: 1; }
+  .mb { display: flex; align-items: center; height: 22px; padding: 0 6px; border-radius: 6px; }
+  .logo { cursor: pointer; width: 32px; justify-content: center; position: relative; }
+  .logo:hover, .logo.open { background: rgba(255,255,255,.14); }
+  .logo svg { width: 17px; height: 17px; overflow: visible; }
+  .logo .bars rect { fill: #fff; transform-box: fill-box; transform-origin: center; transition: transform .12s; }
+  .logo.rec .ring { stroke: var(--ember); filter: drop-shadow(0 0 4px var(--ember)); }
+  .logo.rec .bars rect { fill: var(--ember); }
+  .logo.busy .ring { stroke-dasharray: 10 30; animation: spin .8s linear infinite; transform-origin: 12px 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* HUD capsule */
+  .hud { position: absolute; top: 40px; right: 96px; width: 360px; border-radius: 26px; padding: 14px 16px 12px; z-index: 5;
+         opacity: 0; transform: translateY(-8px) scale(.97); transition: .22s cubic-bezier(.2,.9,.3,1.2); pointer-events: none;
+         -webkit-box-reflect: below 6px linear-gradient(transparent 55%, rgba(255,255,255,.12)); }
+  .hud.show { opacity: 1; transform: none; }
+  .hud-top { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.45); }
+  .ember { width: 7px; height: 7px; border-radius: 50%; background: var(--ember); box-shadow: 0 0 10px var(--ember); animation: breathe 1.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: .35; } }
+  .hud-top .t { margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: .06em; }
+  canvas { display: block; width: 100%; height: 46px; margin: 4px 0 2px; }
+  .hud-text { font-size: 14.5px; line-height: 1.45; min-height: 21px; letter-spacing: .005em;
+              background: linear-gradient(180deg, #ffffff, #b9bcc8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hud-text .vol { -webkit-text-fill-color: rgba(255,255,255,.32); }
+  .hud-foot { margin-top: 10px; display: flex; justify-content: space-between; font-size: 11px; color: rgba(255,255,255,.38); }
+  .chip { padding: 1px 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,.14); color: rgba(255,255,255,.6); }
+
+  /* Context menu */
+  .menu { position: absolute; top: 33px; right: 92px; width: 230px; padding: 6px; border-radius: 14px; font-size: 13px; display: none; z-index: 6; }
+  .menu.show { display: block; }
+  .menu .it { padding: 5px 10px; border-radius: 8px; display: flex; justify-content: space-between; color: rgba(255,255,255,.9); }
+  .menu .it:hover { background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.08)); }
+  .menu .it span { color: rgba(255,255,255,.4); }
+  .menu .lbl { padding: 4px 10px 2px; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.35); }
+  .menu hr { border: 0; height: 1px; margin: 5px 8px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent); }
+
+  /* Windows */
+  .win { position: absolute; border-radius: 16px; overflow: hidden; }
+  .titlebar { height: 38px; display: flex; align-items: center; padding: 0 14px; gap: 8px; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,.55);
+              border-bottom: 1px solid rgba(255,255,255,.06); }
+  .lights { display: flex; gap: 7px; margin-right: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; background: #3a3a42; box-shadow: inset 0 1px 0 rgba(255,255,255,.15); }
+  .notes { left: 36px; top: 72px; width: 450px; height: 350px;
+           -webkit-box-reflect: below 2px linear-gradient(transparent 82%, rgba(255,255,255,.07)); }
+  .notes textarea { width: 100%; height: calc(100% - 38px); border: 0; outline: 0; resize: none; padding: 18px 22px;
+                    font: 15px/1.6 var(--mac); color: #e6e6ec; background: transparent; caret-color: var(--ice); }
+  .flash { animation: fl 1.1s ease; }
+  @keyframes fl { 0% { box-shadow: inset 0 0 60px rgba(207,230,255,.12); } 100% { box-shadow: none; } }
+
+  /* Onboarding */
+  .center { left: 50%; top: 52px; transform: translateX(-50%); }
+  .ob { width: 450px; padding: 26px 24px 20px; border-radius: 22px; text-align: center; }
+  .orb { width: 82px; height: 82px; margin: 4px auto 18px; border-radius: 50%; position: relative;
+         background: radial-gradient(circle at 35% 28%, #fff 0, #c8ccd8 8%, #4a4d58 30%, #0b0b10 62%, #000 100%);
+         box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 20px 50px rgba(0,0,0,.8), 0 0 60px rgba(207,230,255,.10);
+         -webkit-box-reflect: below 4px linear-gradient(transparent 50%, rgba(255,255,255,.22)); }
+  .orb::after { content: ""; position: absolute; inset: 26px 22px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.18); }
+  .ob h2 { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -.01em;
+           background: linear-gradient(180deg, #fff, #9da1ad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ob .sub { color: rgba(255,255,255,.45); font-size: 13px; margin: 6px 0 18px; }
+  .perm { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; margin-bottom: 8px; text-align: left;
+          background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); }
+  .perm .n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; color: rgba(255,255,255,.6);
+             border: 1px solid rgba(255,255,255,.18); }
+  .perm.ok .n { background: linear-gradient(180deg, #fff, #aab); color: #000; border-color: transparent; }
+  .perm .t { flex: 1; font-size: 13px; } .perm .t small { display: block; color: rgba(255,255,255,.4); font-size: 11.5px; margin-top: 1px; }
+  .btn { font: 500 12.5px var(--mac); padding: 6px 13px; border-radius: 9px; cursor: pointer; color: #fff; border: 1px solid rgba(255,255,255,.18);
+         background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04)); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+  .btn:hover { background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,.08)); }
+  .perm.ok .btn { background: none; border-color: transparent; box-shadow: none; color: rgba(255,255,255,.5); cursor: default; }
+  .btn.big { width: 100%; padding: 10px; font-size: 13.5px; margin-top: 8px; color: #0a0a0f; border: 0;
+             background: linear-gradient(180deg, #fff, #c3c6d0); box-shadow: 0 8px 24px rgba(207,230,255,.15); }
+  .btn.big[disabled] { opacity: .25; cursor: default; }
+
+  /* Settings */
+  .set { width: 500px; border-radius: 18px; }
+  .seg { display: flex; gap: 2px; margin: 12px auto 4px; padding: 3px; width: max-content; border-radius: 10px; background: rgba(255,255,255,.05); }
+  .seg div { font-size: 12px; padding: 4px 14px; border-radius: 8px; color: rgba(255,255,255,.5); }
+  .seg .on { color: #fff; background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06)); box-shadow: inset 0 1px 0 rgba(255,255,255,.18); }
+  .set-body { padding: 10px 22px 20px; }
+  .group { border-radius: 14px; padding: 2px 14px; margin-bottom: 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; font-size: 13px; }
+  .row + .row { border-top: 1px solid rgba(255,255,255,.05); }
+  .row small { display: block; color: rgba(255,255,255,.38); font-size: 11.5px; }
+  .sel, .kbd { font: 12px var(--mac); padding: 4px 9px; border-radius: 8px; color: rgba(255,255,255,.85);
+               background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
+  .tog { width: 36px; height: 21px; border-radius: 999px; position: relative; cursor: pointer;
+         background: linear-gradient(180deg, #f2f3f7, #a9adba); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
+  .tog::after { content: ""; position: absolute; top: 2px; left: 17px; width: 17px; height: 17px; border-radius: 50%;
+                background: radial-gradient(circle at 40% 30%, #3a3a44, #0b0b10); box-shadow: 0 1px 3px rgba(0,0,0,.6); transition: .18s; }
+  .tog.off { background: rgba(255,255,255,.1); } .tog.off::after { left: 2px; background: radial-gradient(circle at 40% 30%, #fff, #9aa); }
+  .scene { display: none; } .scene.on { display: block; }
+</style>
+</head>
+<body>
+<div class="tabs">
+  <button class="tab on" data-s="dictate">1 · Dictate</button>
+  <button class="tab" data-s="onboard">2 · First launch</button>
+  <button class="tab" data-s="settings">3 · Settings</button>
+</div>
+<p class="hint" id="hint"></p>
+
+<div class="desk">
+  <div class="menubar">
+    <b>Notes</b><span>File</span><span>Edit</span><span>Format</span><span>View</span>
+    <span class="sp"></span>
+    <span class="mb logo" id="logo" title="Murmur">
+      <svg viewBox="0 0 24 24">
+        <circle class="ring" cx="12" cy="12" r="10" fill="none" stroke="#fff" stroke-width="1.8"/>
+        <g class="bars"><rect x="7" y="9.5" width="2" height="5" rx="1"/><rect x="11" y="7" width="2" height="10" rx="1"/><rect x="15" y="9.5" width="2" height="5" rx="1"/></g>
+      </svg>
+    </span>
+    <span class="mb"><svg width="16" height="12" viewBox="0 0 16 12" fill="rgba(255,255,255,.85)"><path d="M8 11.5 5.6 8.9a3.4 3.4 0 0 1 4.8 0zM3.5 6.8a6.4 6.4 0 0 1 9 0l-1.1 1.1a4.9 4.9 0 0 0-6.8 0zM1.3 4.6a9.5 9.5 0 0 1 13.4 0l-1.1 1.1a7.9 7.9 0 0 0-11.2 0z"/></svg></span>
+    <span>Sat Oct 24&nbsp; 9:41</span>
+  </div>
+
+  <div class="hud mirror" id="hud">
+    <div class="hud-top"><span class="ember"></span><span id="hudLabel">Listening</span><span class="t" id="clock">0:00</span></div>
+    <canvas id="wave" width="656" height="92"></canvas>
+    <div class="hud-text" id="hudText"></div>
+    <div class="hud-foot"><span>→ Notes · Meeting notes</span><span><span class="chip">⌥ Space</span> to finish</span></div>
+  </div>
+
+  <div class="menu mirror" id="menu">
+    <div class="it">Start Dictation <span>⌥Space</span></div><hr>
+    <div class="lbl">Language</div>
+    <div class="it">English (US) <span>✓</span></div><div class="it">Français <span></span></div><hr>
+    <div class="it" data-go="settings">Settings… <span>⌘,</span></div>
+    <div class="it">Quit Murmur <span>⌘Q</span></div>
+  </div>
+
+  <div class="scene on" id="s-dictate">
+    <div class="win notes mirror">
+      <div class="titlebar"><span class="lights"><i></i><i></i><i></i></span>Meeting notes</div>
+      <textarea id="ta" spellcheck="false">Standup — Oct 24
+
+Update: </textarea>
+    </div>
+  </div>
+
+  <div class="scene" id="s-onboard">
+    <div class="win center ob mirror">
+      <div class="orb"></div>
+      <h2>Speak. It types.</h2>
+      <p class="sub">Murmur lives in your menu bar and writes into whatever you’re focused on.<br>Everything stays on this Mac.</p>
+      <div class="perm"><div class="n">1</div><div class="t">Microphone<small>So Murmur can hear you</small></div><button class="btn" data-perm>Allow</button></div>
+      <div class="perm"><div class="n">2</div><div class="t">On-device voice model<small>One-time download from Apple</small></div><button class="btn" data-perm>Download</button></div>
+      <div class="perm"><div class="n">3</div><div class="t">Accessibility<small>So it can type into other apps</small></div><button class="btn" data-perm>Open Settings</button></div>
+      <button class="btn big" id="obDone" disabled>Enter</button>
+    </div>
+  </div>
+
+  <div class="scene" id="s-settings">
+    <div class="win center set mirror">
+      <div class="titlebar" style="justify-content:center;position:relative"><span class="lights" style="position:absolute;left:14px"><i></i><i></i><i></i></span>Murmur</div>
+      <div class="seg"><div class="on">General</div><div>Voice</div><div>Shortcut</div><div>About</div></div>
+      <div class="set-body">
+        <div class="group">
+          <div class="row"><span>Language</span><span class="sel">English (US) ⌄</span></div>
+          <div class="row"><span>Voice engine<small>Apple, on-device</small></span><span class="sel">Apple ⌄</span></div>
+          <div class="row"><span>Insert text by<small>Accessibility first, paste as fallback</small></span><span class="sel">Automatic ⌄</span></div>
+        </div>
+        <div class="group">
+          <div class="row"><span>Shortcut</span><span class="kbd">⌥ Space</span></div>
+          <div class="row"><span>Live transcript capsule</span><span class="tog"></span></div>
+          <div class="row"><span>Start / stop chime</span><span class="tog"></span></div>
+          <div class="row"><span>Launch at login</span><span class="tog off"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const logo = $('logo'), hud = $('hud'), hudText = $('hudText'), ta = $('ta'), menu = $('menu');
+const bars = [...logo.querySelectorAll('.bars rect')];
+const SPEECH = "the menu bar prototype is working, and dictation goes straight into whichever text field I was focused on. Next step is wiring up Apple's on-device speech model.".split(' ');
+let state = 'idle', timer, words = 0, t0 = 0, level = 0, target = 0, phase = 0;
+
+ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+
+// Like a real NSStatusItem: clicking the menu bar never steals focus from your text field.
+logo.addEventListener('mousedown', e => e.preventDefault());
+logo.addEventListener('click', () => { closeMenu(); if (state === 'idle') start(); else if (state === 'recording') stop(); });
+logo.addEventListener('contextmenu', e => { e.preventDefault(); if (state === 'idle') { menu.classList.toggle('show'); logo.classList.toggle('open'); } });
+document.addEventListener('click', e => { if (!logo.contains(e.target)) closeMenu(); });
+menu.querySelector('[data-go]').addEventListener('click', () => show('settings'));
+function closeMenu() { menu.classList.remove('show'); logo.classList.remove('open'); }
+
+function start() {
+  state = 'recording'; words = 0; t0 = performance.now(); hudText.innerHTML = ''; $('hudLabel').textContent = 'Listening';
+  logo.classList.add('rec'); hud.classList.add('show');
+  timer = setInterval(() => {
+    words++;
+    const k = Math.max(0, words - 3);
+    hudText.innerHTML = SPEECH.slice(0, k).join(' ') + (words > k ? ' <span class="vol">' + SPEECH.slice(k, words).join(' ') + '</span>' : '');
+    if (words >= SPEECH.length) { clearInterval(timer); hudText.textContent = SPEECH.join(' '); }
+  }, 170);
+}
+
+function stop() {
+  clearInterval(timer);
+  const text = SPEECH.slice(0, Math.max(words, 1)).join(' ');
+  state = 'finalizing'; logo.classList.remove('rec'); logo.classList.add('busy');
+  $('hudLabel').textContent = 'Sealing'; hudText.textContent = text;
+  setTimeout(() => {
+    const s = ta.selectionStart, e = ta.selectionEnd, before = ta.value.slice(0, s);
+    const ins = (before && !/\s$/.test(before) ? ' ' : '') + (/[.!?]$/.test(text) ? text : text + '.');
+    ta.setRangeText(ins, s, e, 'end'); ta.focus();
+    const win = ta.parentElement; win.classList.remove('flash'); void win.offsetWidth; win.classList.add('flash');
+    hud.classList.remove('show'); logo.classList.remove('busy'); state = 'idle';
+  }, 700);
+}
+
+// Liquid-mercury waveform
+const cv = $('wave'), cx = cv.getContext('2d');
+function frame() {
+  const W = cv.width, H = cv.height, mid = H / 2;
+  if (state === 'recording' && Math.random() < .12) target = .35 + Math.random() * .65;
+  if (state !== 'recording') target = 0;
+  level += (target - level) * .08; phase += .06;
+  cx.clearRect(0, 0, W, H);
+  const layers = [[.9, 1, 'rgba(255,255,255,.95)', 2.2], [.6, 1.7, 'rgba(207,230,255,.45)', 1.6], [.4, 2.6, 'rgba(255,90,60,.5)', 1.4]];
+  for (const [amp, freq, col, lw] of layers) {
+    cx.beginPath();
+    for (let x = 0; x <= W; x += 4) {
+      const n = x / W, env = Math.sin(Math.PI * n) ** 2;
+      const y = mid + Math.sin(n * Math.PI * 4 * freq + phase * freq) * env * amp * level * (H * .42) + Math.sin(n * 40 + phase * 3) * level * 2;
+      x ? cx.lineTo(x, y) : cx.moveTo(x, y);
+    }
+    const g = cx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, col); g.addColorStop(1, 'rgba(255,255,255,0)');
+    cx.strokeStyle = g; cx.lineWidth = lw; cx.shadowColor = col; cx.shadowBlur = 8; cx.stroke();
+  }
+  bars.forEach((b, i) => b.style.transform = state === 'recording' ? `scaleY(${.5 + level * (i === 1 ? 1 : .9) * (0.6 + Math.random() * .5)})` : '');
+  if (state === 'recording') { const s = Math.floor((performance.now() - t0) / 1000); $('clock').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  requestAnimationFrame(frame);
+}
+frame();
+
+// Scenes
+const hints = {
+  dictate: 'Place your cursor in the note, then click the <b>ring icon</b> in the menu bar. Click again to stop. Right-click it for the menu.',
+  onboard: 'First launch — click each step to grant it.',
+  settings: 'Settings, from the right-click menu or ⌘,'
+};
+function show(s) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.s === s));
+  document.querySelectorAll('.scene').forEach(el => el.classList.toggle('on', el.id === 's-' + s));
+  $('hint').innerHTML = hints[s]; closeMenu();
+  if (s === 'dictate') ta.focus();
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => show(t.dataset.s)));
+document.querySelectorAll('[data-perm]').forEach(b => b.addEventListener('click', () => {
+  const p = b.closest('.perm'); if (p.classList.contains('ok')) return;
+  p.classList.add('ok'); p.querySelector('.n').textContent = '✓'; b.textContent = 'Granted';
+  $('obDone').disabled = document.querySelectorAll('.perm:not(.ok)').length > 0;
+}));
+$('obDone').addEventListener('click', () => show('dictate'));
+document.querySelectorAll('.tog').forEach(t => t.addEventListener('click', () => t.classList.toggle('off')));
+show('dictate');
+</script>
+</body>
+</html>
