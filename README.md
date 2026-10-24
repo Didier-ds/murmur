@@ -1,6 +1,14 @@
+<p align="center">
+  <img src="docs/assets/hero.png" alt="Murmur: speak anywhere on your Mac" width="100%">
+</p>
+
 # Murmur
 
 A macOS menu bar app that types with your voice. Click the ring in the menu bar, speak, then press Esc or click again, and the text lands in whatever field you were typing in.
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Dictating into Notes: the capsule shows live words, Esc finishes, and the text is typed into the note" width="100%">
+</p>
 
 - **On-device:** Apple's `SpeechAnalyzer` / `SpeechTranscriber` (macOS 26). Audio never leaves your Mac.
 - **Inserts anywhere:** uses the Accessibility API, and falls back to pasting. If there's no text field to type into, the text stays on your clipboard so you can paste it with ⌘V.
@@ -53,3 +61,7 @@ Found a vulnerability? See [SECURITY.md](SECURITY.md).
 | `Permissions` | Microphone, speech and Accessibility checks |
 
 `promo/` holds the Remotion source for the launch video. It's development tooling only and isn't part of the app.
+
+## License
+
+[MIT](LICENSE)
