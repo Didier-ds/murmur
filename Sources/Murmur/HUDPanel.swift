@@ -116,7 +116,7 @@ struct HUDView: View {
         HStack {
             Text("→ \(model.targetName)")
             Spacer()
-            Text("esc to cancel · click ◎ to finish")
+            Text("esc or click ◎ to finish")
         }
         .font(.system(size: 11))
         .foregroundStyle(.white.opacity(0.38))

@@ -16,7 +16,8 @@ final class DictationCoordinator {
         makeMenu: { [weak self] in self?.makeMenu() ?? NSMenu() },
         level: { [weak self] in self?.model.level ?? 0 }
     )
-    private lazy var escapeMonitor = EscapeKeyMonitor(onEscape: { [weak self] in self?.cancel() })
+    // Esc finishes dictation and inserts the text, like clicking the ring again.
+    private lazy var escapeMonitor = EscapeKeyMonitor(onEscape: { [weak self] in self?.toggle() })
 
     private var state = State.idle
     private var setup = Setup.checking
@@ -139,7 +140,7 @@ final class DictationCoordinator {
         statusItem.look = .idle
     }
 
-    /// Esc while listening: throw the dictation away without inserting anything.
+    /// Throw the dictation away without inserting anything (menu → Cancel Dictation).
     func cancel() {
         guard state == .recording, let session else { return }
         escapeMonitor.stop()

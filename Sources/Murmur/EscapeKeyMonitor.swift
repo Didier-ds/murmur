@@ -4,7 +4,7 @@ import CoreGraphics
 /// Catches a plain Esc press system-wide while dictation is active.
 ///
 /// Murmur is never the active app, so Esc goes to whatever app the user is typing in.
-/// An event tap lets us see it first and swallow it, so cancelling dictation doesn't
+/// An event tap lets us see it first and swallow it, so finishing dictation doesn't
 /// also dismiss a dialog or clear a field in that app. Requires Accessibility permission;
 /// without a tap we fall back to a global monitor, which sees Esc but can't swallow it.
 @MainActor
@@ -69,7 +69,7 @@ final class EscapeKeyMonitor {
             guard keyCode == Self.escapeKeyCode,
                   !Self.hasModifiers(NSEvent.ModifierFlags(rawValue: UInt(flags.rawValue))) else { return false }
             swallowingKeyUp = true
-            // Cancelling tears down this tap; don't do that from inside its own callback.
+            // Finishing tears down this tap; don't do that from inside its own callback.
             Task { [weak self] in self?.onEscape() }
             return true
         case .keyUp:
