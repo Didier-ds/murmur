@@ -23,10 +23,14 @@ enum Permissions {
 
     static func requestSpeech() async -> Bool {
         if SFSpeechRecognizer.authorizationStatus() == .authorized { return true }
-        let status = await withCheckedContinuation { continuation in
+        return await requestSpeechAuthorization() == .authorized
+    }
+
+    /// Nonisolated so the callback (delivered on a background queue) isn't assumed to be on the main actor.
+    private nonisolated static func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+        await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
         }
-        return status == .authorized
     }
 
     /// Needed both to write into other apps' text fields and to post ⌘V.
