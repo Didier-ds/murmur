@@ -9,6 +9,7 @@ final class DictationCoordinator {
 
     private let log = Logger(subsystem: "dev.murmur.Murmur", category: "dictation")
     private let model = DictationModel()
+    private let inserter = InsertionService()
     private lazy var statusItem = StatusItemController(
         onToggle: { [weak self] in self?.toggle() },
         makeMenu: { [weak self] in self?.makeMenu() ?? NSMenu() },
@@ -19,6 +20,7 @@ final class DictationCoordinator {
     private var setup = Setup.checking
     private var locale: Locale?
     private var session: SpeechSession?
+    private var target: FocusTarget?
     private var lastMessage: String?
 
     private var playSounds: Bool {
@@ -73,7 +75,9 @@ final class DictationCoordinator {
         }
 
         state = .starting
-        model.reset(targetName: NSWorkspace.shared.frontmostApplication?.localizedName ?? "")
+        let target = FocusTarget.capture()
+        self.target = target
+        model.reset(targetName: target.appName)
 
         do {
             let model = self.model
@@ -99,7 +103,7 @@ final class DictationCoordinator {
     }
 
     private func stop() async {
-        guard let session else { return }
+        guard let session, let target else { return }
         state = .finalizing
         statusItem.look = .busy
         model.label = "Sealing"
@@ -113,9 +117,14 @@ final class DictationCoordinator {
         }
         self.session = nil
 
-        log.info("Transcribed: \(text, privacy: .private)")
-        lastMessage = nil
-        if playSounds && !text.isEmpty { NSSound(named: "Pop")?.play() }
+        let method = await inserter.insert(text, into: target)
+        log.info("Inserted \(text.count) chars via \(method?.rawValue ?? "nothing", privacy: .public)")
+        if method == .paste && !Permissions.accessibilityGranted {
+            lastMessage = "Text is on your clipboard. Grant Accessibility so Murmur can type it for you."
+        } else {
+            lastMessage = nil
+        }
+        if playSounds && method != nil { NSSound(named: "Pop")?.play() }
 
         state = .idle
         statusItem.look = .idle
