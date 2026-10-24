@@ -38,12 +38,15 @@ PLIST
 # macOS ties Accessibility permission to the signature. With the local "Murmur Dev"
 # certificate (scripts/create-signing-cert.sh) the permission survives rebuilds;
 # with an ad-hoc signature it has to be granted again after every build.
+# Hardened Runtime blocks code injection and is required for notarization; the
+# entitlements file grants back only microphone access.
+ENTITLEMENTS=packaging/Murmur.entitlements
 IDENTITY="Murmur Dev"
 if security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
-    codesign --force --sign "$IDENTITY" --identifier "$BUNDLE_ID" "$APP"
+    codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" --identifier "$BUNDLE_ID" "$APP"
     echo "Built $APP (signed with $IDENTITY)"
 else
-    codesign --force --sign - --identifier "$BUNDLE_ID" "$APP"
+    codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign - --identifier "$BUNDLE_ID" "$APP"
     echo "Built $APP (ad-hoc signed; run scripts/create-signing-cert.sh to keep permissions across rebuilds)"
 fi
 
