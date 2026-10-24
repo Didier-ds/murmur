@@ -33,10 +33,12 @@ final class DictationCoordinator {
 
     func bootstrap() async {
         _ = statusItem
+        // Download the voice model while the user answers the permission prompts.
+        async let model: Void = prepareModel()
         _ = await Permissions.requestMicrophone()
         _ = await Permissions.requestSpeech()
         if !Permissions.accessibilityGranted { Permissions.promptAccessibility() }
-        await prepareModel()
+        await model
     }
 
     private func prepareModel() async {
