@@ -35,10 +35,17 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Ad-hoc signature. macOS ties Accessibility permission to the signature,
-# so after each rebuild you may need to toggle Murmur off/on in Accessibility settings.
-codesign --force --sign - --identifier "$BUNDLE_ID" "$APP"
-echo "Built $APP"
+# macOS ties Accessibility permission to the signature. With the local "Murmur Dev"
+# certificate (scripts/create-signing-cert.sh) the permission survives rebuilds;
+# with an ad-hoc signature it has to be granted again after every build.
+IDENTITY="Murmur Dev"
+if security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
+    codesign --force --sign "$IDENTITY" --identifier "$BUNDLE_ID" "$APP"
+    echo "Built $APP (signed with $IDENTITY)"
+else
+    codesign --force --sign - --identifier "$BUNDLE_ID" "$APP"
+    echo "Built $APP (ad-hoc signed; run scripts/create-signing-cert.sh to keep permissions across rebuilds)"
+fi
 
 if [[ "${1:-}" == "--run" ]]; then
     pkill -x Murmur 2>/dev/null || true
