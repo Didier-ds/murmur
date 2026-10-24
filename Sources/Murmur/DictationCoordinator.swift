@@ -34,6 +34,7 @@ final class DictationCoordinator {
 
     func bootstrap() async {
         _ = statusItem
+        log.info("Accessibility trusted: \(Permissions.accessibilityGranted, privacy: .public)")
         // Download the voice model while the user answers the permission prompts.
         async let model: Void = prepareModel()
         _ = await Permissions.requestMicrophone()
@@ -127,14 +128,14 @@ final class DictationCoordinator {
 
         let method = await inserter.insert(text, into: target)
         log.info("Inserted \(text.count) chars via \(method?.rawValue ?? "nothing", privacy: .public)")
-        if method == .paste && !Permissions.accessibilityGranted {
-            lastMessage = "Text is on your clipboard. Grant Accessibility so Murmur can type it for you."
-        } else {
-            lastMessage = nil
-        }
-        if playSounds && method != nil { NSSound(named: "Pop")?.play() }
-
         state = .idle
+        if method == .clipboard {
+            flashError("Copied to clipboard — press ⌘V. Murmur needs Accessibility access to type for you.")
+            Permissions.promptAccessibility()
+            return
+        }
+        lastMessage = nil
+        if playSounds && method != nil { NSSound(named: "Pop")?.play() }
         statusItem.look = .idle
     }
 

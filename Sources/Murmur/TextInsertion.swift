@@ -29,11 +29,19 @@ struct FocusTarget {
 /// Inserts text at the cursor: Accessibility first, clipboard + ⌘V as fallback.
 @MainActor
 final class InsertionService {
-    enum Method: String { case accessibility, paste }
+    enum Method: String { case accessibility, paste, clipboard }
 
     func insert(_ raw: String, into target: FocusTarget) async -> Method? {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
+
+        // Without Accessibility, macOS silently drops both AX writes and the simulated ⌘V.
+        // Leave the text on the clipboard so it isn't lost.
+        guard Permissions.accessibilityGranted else {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            return .clipboard
+        }
 
         // If the user switched apps mid-dictation, go back to where they started.
         if let app = target.app, NSWorkspace.shared.frontmostApplication?.processIdentifier != app.processIdentifier {
