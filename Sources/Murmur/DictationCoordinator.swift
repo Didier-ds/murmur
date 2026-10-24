@@ -221,8 +221,9 @@ final class DictationCoordinator {
         }
         if let lastTranscript {
             menu.addItem(action("Copy Last Dictation") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(lastTranscript, forType: .string)
+                let pasteboard = NSPasteboard.general
+                pasteboard.prepareForNewContents(with: .currentHostOnly)
+                pasteboard.setString(InsertionService.sanitize(lastTranscript), forType: .string)
             })
         }
 
