@@ -42,5 +42,6 @@ echo "Built $APP"
 
 if [[ "${1:-}" == "--run" ]]; then
     pkill -x Murmur 2>/dev/null || true
+    while pgrep -x Murmur >/dev/null; do sleep 0.1; done # open fails if the old instance is still exiting
     open "$APP"
 fi
